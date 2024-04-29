@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="50">
+    <title>Sensor Data</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	<style>
+        table {
+margin-left: auto;
+margin-right: auto;
+width: 80%; 
+}
+        .total-electric-power {
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-top: 20px;
+			border: 5px solid #DDD;
+        }
+
+        .cost-electric-power {
+            font-weight: bold;
+            font-size: 1.2em;
+            color: #4CAF50; /* Couleur verte */
+			border: 5px solid #DDD;
+			
+        }
+		body {
+    background : url('hello.jpg');
+    box-sizing: border-box;
+    font-size: 1.8rem;
+    letter-spacing: -0.015em;
+    text-align: center;
+}
+div {
+  width: 45%; /* ou une valeur appropriée en pourcentage, pixels, em, etc. */
+  height: 400px; /* ou une valeur appropriée en pixels, pourcentage, em, etc. */
+
+display: inline-block;
+}
+th {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 25px;
+  background: #666;
+  color: #FFF;
+  padding: 6px 6px;
+  border-collapse: separate;
+  border: 1px solid #000;
+}
+td {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 18px; /* Ajustez la taille du texte dans les cellules de données */
+  text-align: center;
+  border: 1px solid #DDD;
+   font-weight: bold;
+}
+    </style>
+</head>
+<body>
+
+    <h1>Tracker Solaire DATA</h1>
+
+    <div>
+    <canvas id="batteryLevelChart"></canvas>
+</div>
+
+<div>
+    <canvas id="electricPowerChart"></canvas>
+</div>
+
+
+    <script>
+<?php
+    function connectToDatabase() {
+        $servername = "localhost";
+        $username = "root";
+        $password = "";
+        $dbname = "tracker_solaire";
+        $conn = new mysqli($servername, $username, $password, $dbname);
+        if ($conn->connect_error) {
+            die("Connection failed: " . $conn->connect_error);
+        }
+        return $conn;
+    }
+
+    function fetchData($conn, $sql) {
+        $result = $conn->query($sql);
+        $data = [];
+        while ($row = $result->fetch_assoc()) {
+            $data[] = $row;
+        }
+        return $data;
+    }
+
+    $conn = connectToDatabase();
+    $sql = "SELECT time, electric_power, battery_level FROM sensordata ORDER BY id DESC LIMIT 6";
+    $data = fetchData($conn, $sql);
+	$sql_sum_electric_power = "SELECT SUM(electric_power) AS total_electric_power FROM sensordata";
+    $result_sum_electric_power = $conn->query($sql_sum_electric_power);
+    $row_sum_electric_power = $result_sum_electric_power->fetch_assoc();
+    $total_electric_power = $row_sum_electric_power['total_electric_power'];
+	$cost_electric_power = $total_electric_power*0.22;
+
+    $labels = [];
+    $electricPowerData = [];
+    $batteryLevelData = [];
+
+    foreach ($data as $row) {
+        $labels[] = $row["time"];
+        $electricPowerData[] = $row["electric_power"];
+        $batteryLevelData[] = $row["battery_level"];
+		
+    }
+
+    $conn->close();
+    ?>
+	
+    // Première figure pour le niveau de batterie (%)
+var batteryLevelData = {
+    labels: <?php echo json_encode($labels); ?>,
+    datasets: [{
+        type: 'bar',
+        label: 'Battery Level (%)',
+        borderColor: 'rgb(75, 192, 192)',
+        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        data: <?php echo json_encode($batteryLevelData); ?>,
+        fill: false,
+    }]
+};
+
+var batteryLevelOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+};
+
+var batteryLevelCtx = document.getElementById('batteryLevelChart').getContext('2d');
+var batteryLevelChart = new Chart(batteryLevelCtx, {
+    type: 'bar',
+    data: batteryLevelData,
+    options: batteryLevelOptions
+});
+
+// Deuxième figure pour la puissance électrique (kWh)
+var electricPowerData = {
+    labels: <?php echo json_encode($labels); ?>,
+    datasets: [{
+        type: 'line',
+        label: 'Electric Power (kWh)',
+        borderColor: 'rgb(255, 99, 132)',
+        data: <?php echo json_encode($electricPowerData); ?>,
+        fill: false,
+    }]
+};
+
+var electricPowerOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+};
+
+var electricPowerCtx = document.getElementById('electricPowerChart').getContext('2d');
+var electricPowerChart = new Chart(electricPowerCtx, {
+    type: 'line',
+    data: electricPowerData,
+    options: electricPowerOptions
+});
+
+    </script>
+<p class="total-electric-power">Total Electric Power (kWh): <?php echo $total_electric_power; ?></p>
+    <p class="cost-electric-power">Cost (€): <?php echo $cost_electric_power; ?></p>
+    <table>
+        <?php
+        $conn = connectToDatabase();
+        $sql = "SELECT id, time, electric_power, battery_level FROM sensordata ORDER BY id DESC";
+        $data = fetchData($conn, $sql);
+
+        echo '<table cellspacing="5" cellpadding="5" >
+              <tr> 
+                <th>ID</th> 
+                <th>Time</th> 
+                <th>Electric power (kWh)</th> 
+                <th>Battery level (%)</th>        
+              </tr>';
+
+        foreach ($data as $row) {
+            echo '<tr> 
+                    <td>' . $row["id"] . '</td> 
+                    <td>' . $row["time"] . '</td> 
+                    <td>' . $row["electric_power"] . '</td> 
+                    <td>' . $row["battery_level"] . '</td>            
+                  </tr>';
+        }
+
+        $conn->close();
+        ?> 
+    </table>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
